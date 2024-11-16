@@ -32,7 +32,7 @@ namespace PromoCodeFactory.WebHost.Services
             }).ToList();
         }
 
-        public async Task<EmployeeResponse> GetEmployeeByIdAsync(Guid id, CancellationToken cancellationToken)
+        public async Task<EmployeeResponse?> GetEmployeeByIdAsync(Guid id, CancellationToken cancellationToken)
         {
             var employee = await _employeeRepository.GetByIdAsync(id, cancellationToken);
             if (employee == null)
@@ -55,10 +55,15 @@ namespace PromoCodeFactory.WebHost.Services
 
         public async Task<EmployeeResponse> CreateEmployeeAsync(EmployeeCreateRequest request, CancellationToken cancellationToken)
         {
-            // Проверка email
             if (!new EmailAddressAttribute().IsValid(request.Email))
             {
                 throw new ArgumentException("Некорректный формат email.");
+            }
+
+            var existingEmployees = await _employeeRepository.GetAllAsync(cancellationToken);
+            if (existingEmployees.Any(e => string.Equals(e.Email, request.Email, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new ArgumentException($"Сотрудник с почтой {request.Email} уже существует.");
             }
 
             // Проверка и получение ролей
@@ -115,17 +120,20 @@ namespace PromoCodeFactory.WebHost.Services
 
         public async Task UpdateEmployeeAsync(Guid id, EmployeeUpdateRequest request, CancellationToken cancellationToken)
         {
+            // Получаем сотрудника из репозитория
             var employee = await _employeeRepository.GetByIdAsync(id, cancellationToken);
             if (employee == null)
             {
-                throw new ArgumentException("Сотрудник не найден.");
+                throw new KeyNotFoundException($"Сотрудник с Id {id} не найден.");
             }
 
+            // Проверка валидности email
             if (!new EmailAddressAttribute().IsValid(request.Email))
             {
                 throw new ArgumentException("Некорректный формат email.");
             }
 
+            // Получение валидных ролей
             var validRoleIds = request.RoleIdList
                 .Where(roleId => Guid.TryParse(roleId, out _))
                 .Select(Guid.Parse)
@@ -134,17 +142,20 @@ namespace PromoCodeFactory.WebHost.Services
             var roles = await _rolesRepository.GetAllAsync(cancellationToken);
             var employeeRoles = roles.Where(r => validRoleIds.Contains(r.Id)).ToList();
 
+            // Проверка отсутствующих ролей
             var missingRoles = validRoleIds.Except(employeeRoles.Select(r => r.Id)).ToList();
             if (missingRoles.Any())
             {
                 throw new ArgumentException($"Роли не найдены для Id: {string.Join(", ", missingRoles)}");
             }
 
+            // Обновление данных сотрудника
             employee.FirstName = request.FirstName;
             employee.LastName = request.LastName;
             employee.Email = request.Email;
             employee.Roles = employeeRoles;
 
+            // Сохранение изменений в репозитории
             await _employeeRepository.UpdateAsync(employee, cancellationToken);
         }
     }
