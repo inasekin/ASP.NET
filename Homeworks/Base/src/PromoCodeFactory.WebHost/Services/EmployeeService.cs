@@ -88,7 +88,6 @@ namespace PromoCodeFactory.WebHost.Services
                 LastName = request.LastName,
                 Email = request.Email,
                 Roles = employeeRoles,
-                AppliedPromocodesCount = 0
             };
 
             await _employeeRepository.AddAsync(newEmployee, cancellationToken);
