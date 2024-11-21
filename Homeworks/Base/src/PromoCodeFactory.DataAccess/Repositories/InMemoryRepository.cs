@@ -19,19 +19,16 @@ namespace PromoCodeFactory.DataAccess.Repositories
 
         public Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult<IEnumerable<T>>(_data);
         }
 
         public Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult<T?>(_data.FirstOrDefault(x => x.Id == id));
         }
 
         public Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             entity.Id = Guid.NewGuid();
             _data.Add(entity);
             return Task.FromResult(entity);
@@ -39,7 +36,6 @@ namespace PromoCodeFactory.DataAccess.Repositories
 
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var entity = _data.FirstOrDefault(x => x.Id == id);
             if (entity == null)
             {
@@ -52,7 +48,6 @@ namespace PromoCodeFactory.DataAccess.Repositories
 
         public Task<T?> UpdateAsync(T entity, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var existingEntity = _data.FirstOrDefault(x => x.Id == entity.Id);
             if (existingEntity == null)
             {

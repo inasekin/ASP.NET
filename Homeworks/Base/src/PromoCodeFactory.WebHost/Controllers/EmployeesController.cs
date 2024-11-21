@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PromoCodeFactory.WebHost.Models;
 using PromoCodeFactory.WebHost.Services;
 
@@ -16,14 +17,17 @@ namespace PromoCodeFactory.WebHost.Controllers
     public class EmployeesController : ControllerBase
     {
         private readonly EmployeeService _employeeService;
+        private readonly ILogger<EmployeesController> _logger;
 
         /// <summary>
         /// Конструктор контроллера сотрудников.
         /// </summary>
         /// <param name="employeeService">Сервис для работы с сотрудниками.</param>
-        public EmployeesController(EmployeeService employeeService)
+        /// <param name="logger">Логгер для записи событий.</param>
+        public EmployeesController(EmployeeService employeeService, ILogger<EmployeesController> logger)
         {
             _employeeService = employeeService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -49,7 +53,10 @@ namespace PromoCodeFactory.WebHost.Controllers
         {
             var employee = await _employeeService.GetEmployeeByIdAsync(id, cancellationToken);
             if (employee == null)
-                return NotFound();
+            {
+                _logger.LogWarning("Сотрудник с идентификатором {EmployeeId} не найден.", id);
+                return NotFound(new { Message = "Сотрудник не найден." });
+            }
 
             return Ok(employee);
         }
@@ -66,11 +73,12 @@ namespace PromoCodeFactory.WebHost.Controllers
             try
             {
                 var employee = await _employeeService.CreateEmployeeAsync(request, cancellationToken);
-                return Ok(employee);
+                return CreatedAtAction(nameof(GetEmployeeByIdAsync), new { id = employee.Id }, employee);
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { Error = ex.Message });
+                _logger.LogWarning("Ошибка при создании сотрудника: {ErrorMessage}", ex.Message);
+                return BadRequest(new { Message = "Некорректные данные запроса." });
             }
         }
 
@@ -85,7 +93,10 @@ namespace PromoCodeFactory.WebHost.Controllers
         {
             var result = await _employeeService.DeleteEmployeeAsync(id, cancellationToken);
             if (!result)
-                return NotFound(new { Error = "Сотрудник не найден." });
+            {
+                _logger.LogWarning("Попытка удаления сотрудника с идентификатором {EmployeeId}, который не найден.", id);
+                return NotFound(new { Message = "Сотрудник не найден." });
+            }
 
             return NoContent();
         }
@@ -105,13 +116,15 @@ namespace PromoCodeFactory.WebHost.Controllers
                 await _employeeService.UpdateEmployeeAsync(id, request, cancellationToken);
                 return NoContent();
             }
-            catch (KeyNotFoundException ex) // Если сотрудник не найден
+            catch (KeyNotFoundException ex)
             {
-                return NotFound(new { Error = ex.Message });
+                _logger.LogWarning("Сотрудник с идентификатором {EmployeeId} не найден для обновления.", id);
+                return NotFound(new { Message = "Сотрудник не найден." });
             }
-            catch (ArgumentException ex) // Если переданы некорректные данные
+            catch (ArgumentException ex)
             {
-                return BadRequest(new { Error = ex.Message });
+                _logger.LogWarning("Некорректные данные для обновления сотрудника с идентификатором {EmployeeId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(new { Message = "Некорректные данные запроса." });
             }
         }
     }
