@@ -10,10 +10,8 @@ namespace PromoCodeFactory.WebHost.Models
 
         public string ServiceInfo { get; set; }
 
-        public string BeginDate { get; set; }
+        public DateTime BeginDate { get; set; }
 
-        public string EndDate { get; set; }
-
-        public string PartnerName { get; set; }
+        public DateTime EndDate { get; set; }
     }
 }
