@@ -132,7 +132,7 @@ namespace PromoCodeFactory.UnitTests.WebHost.Controllers.Partners
         public async Task SetPartnerPromoCodeLimitAsync_ExpiredLimitExists_ShouldNotResetIssuedCodes()
         {
             var partnerId = Guid.NewGuid();
-            var expiredLimit = CreateLimit(Guid.NewGuid(), 10, endDate: DateTime.Now.AddDays(-2));
+            var expiredLimit = CreateLimit(Guid.NewGuid(), 10, DateTime.Now.AddDays(-5));
             var partner = CreatePartner(partnerId, true, 25, new List<PartnerPromoCodeLimit> { expiredLimit });
 
             _partnerRepositoryMock
@@ -149,7 +149,14 @@ namespace PromoCodeFactory.UnitTests.WebHost.Controllers.Partners
 
             result.Should().BeOfType<CreatedAtActionResult>();
 
-            partner.NumberIssuedPromoCodes.Should().Be(25);
+            partner.NumberIssuedPromoCodes.Should().Be(25); // Счётчик не сбрасывается
+
+            expiredLimit.CancelDate.Should().NotBeNull(); // Истёкший лимит отключён
+
+            partner.PartnerLimits.Should().HaveCount(2);
+            var newLimit = partner.PartnerLimits.Last();
+            newLimit.Limit.Should().Be(100);
+
             _partnerRepositoryMock.Verify(r => r.UpdateAsync(partner), Times.Once);
         }
 

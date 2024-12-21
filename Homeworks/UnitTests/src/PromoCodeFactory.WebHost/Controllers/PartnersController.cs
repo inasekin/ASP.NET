@@ -93,7 +93,10 @@ namespace PromoCodeFactory.WebHost.Controllers
 
             if (activeLimit != null)
             {
-                partner.NumberIssuedPromoCodes = 0;
+                if (!activeLimit.EndDate.HasValue || activeLimit.EndDate > DateTime.Now)
+                {
+                    partner.NumberIssuedPromoCodes = 0; // Сбрасываем только для активных лимитов
+                }
                 activeLimit.CancelDate = DateTime.Now;
             }
 

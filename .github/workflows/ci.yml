@@ -1,0 +1,25 @@
+image: mcr.microsoft.com/dotnet/sdk:8.0
+
+stages:
+  - test
+  - build
+
+test:
+  stage: test
+  script:
+    - dotnet restore Homeworks/UnitTests/src
+    - dotnet build Homeworks/UnitTests/src --no-restore
+    - dotnet test Homeworks/UnitTests/src --no-build --verbosity normal
+  only:
+    - merge_requests
+    - dev
+    - main
+
+build:
+  stage: build
+  script:
+    - dotnet restore Homeworks/UnitTests/src
+    - dotnet build Homeworks/UnitTests/src --no-restore --verbosity normal
+  only:
+    - main
+

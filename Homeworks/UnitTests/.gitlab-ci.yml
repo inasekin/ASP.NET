@@ -3,28 +3,10 @@ image: docker:stable
 services:
   - docker:dind
 
-stages:
-  - test
-  - build
-
 before_script:
   - docker info
 
-test:
-  stage: test
-  image: mcr.microsoft.com/dotnet/sdk:6.0
-  script:
-    - dotnet restore
-    - dotnet build --no-restore
-    - dotnet test --no-build --verbosity normal
-  only:
-    - master
-    - dev
-  tags:
-    - docker
-
 build:
-  stage: build
   only:
     - master
   before_script:
@@ -34,5 +16,6 @@ build:
     - docker push ${CI_REGISTRY}/${CI_PROJECT_PATH}:latest
   after_script:
     - docker logout ${CI_REGISTRY}
-  tags:
+  stage: build
+  tags: 
     - docker
