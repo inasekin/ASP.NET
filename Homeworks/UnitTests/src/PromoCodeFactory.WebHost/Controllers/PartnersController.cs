@@ -42,7 +42,7 @@ namespace PromoCodeFactory.WebHost.Controllers
                         PartnerId = y.PartnerId,
                         Limit = y.Limit,
                         CreateDate = y.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                        EndDate = y.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                        EndDate = y.EndDate?.ToString("dd.MM.yyyy hh:mm:ss"),
                         CancelDate = y.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
                     }).ToList()
             });
@@ -67,7 +67,7 @@ namespace PromoCodeFactory.WebHost.Controllers
                 PartnerId = limit.PartnerId,
                 Limit = limit.Limit,
                 CreateDate = limit.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                EndDate = limit.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                EndDate = limit.EndDate?.ToString("dd.MM.yyyy hh:mm:ss"),
                 CancelDate = limit.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
             };
             
@@ -81,43 +81,44 @@ namespace PromoCodeFactory.WebHost.Controllers
 
             if (partner == null)
                 return NotFound();
-            
-            //Если партнер заблокирован, то нужно выдать исключение
+
             if (!partner.IsActive)
                 return BadRequest("Данный партнер не активен");
-            
-            //Установка лимита партнеру
-            var activeLimit = partner.PartnerLimits.FirstOrDefault(x => 
-                !x.CancelDate.HasValue);
-            
+
+            if (partner.PartnerLimits == null)
+                partner.PartnerLimits = new List<PartnerPromoCodeLimit>(); // Инициализируем, если null
+
+            var activeLimit = partner.PartnerLimits
+                .FirstOrDefault(x => !x.CancelDate.HasValue);
+
             if (activeLimit != null)
             {
-                //Если партнеру выставляется лимит, то мы 
-                //должны обнулить количество промокодов, которые партнер выдал, если лимит закончился, 
-                //то количество не обнуляется
-                partner.NumberIssuedPromoCodes = 0;
-                
-                //При установке лимита нужно отключить предыдущий лимит
+                if (!activeLimit.EndDate.HasValue || activeLimit.EndDate > DateTime.Now)
+                {
+                    partner.NumberIssuedPromoCodes = 0; // Сбрасываем только для активных лимитов
+                }
                 activeLimit.CancelDate = DateTime.Now;
             }
 
             if (request.Limit <= 0)
                 return BadRequest("Лимит должен быть больше 0");
-            
-            var newLimit = new PartnerPromoCodeLimit()
+
+            var newLimit = new PartnerPromoCodeLimit
             {
+                Id = Guid.NewGuid(),
                 Limit = request.Limit,
                 Partner = partner,
                 PartnerId = partner.Id,
                 CreateDate = DateTime.Now,
-                EndDate = request.EndDate
+                EndDate = request.EndDate,
+                CancelDate = null
             };
-            
+
             partner.PartnerLimits.Add(newLimit);
 
             await _partnersRepository.UpdateAsync(partner);
-            
-            return CreatedAtAction(nameof(GetPartnerLimitAsync), new {id = partner.Id, limitId = newLimit.Id}, null);
+
+            return CreatedAtAction(nameof(GetPartnerLimitAsync), new { id = partner.Id, limitId = newLimit.Id }, null);
         }
         
         [HttpPost("{id}/canceledLimits")]

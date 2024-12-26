@@ -1,0 +1,42 @@
+name: .NET CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0
+    - name: Restore dependencies
+      run: dotnet restore Homeworks/UnitTests/src
+    - name: Build project
+      run: dotnet build Homeworks/UnitTests/src --no-restore
+    - name: Run tests
+      run: dotnet test Homeworks/UnitTests/src --no-build --verbosity normal
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0
+    - name: Restore dependencies
+      run: dotnet restore Homeworks/UnitTests/src
+    - name: Build project
+      run: dotnet build Homeworks/UnitTests/src --no-restore --verbosity normal
+

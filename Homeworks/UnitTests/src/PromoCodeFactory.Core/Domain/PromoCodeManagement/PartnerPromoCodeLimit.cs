@@ -14,7 +14,7 @@ namespace PromoCodeFactory.Core.Domain.PromoCodeManagement
 
         public DateTime? CancelDate { get; set; }
 
-        public DateTime EndDate { get; set; }
+        public DateTime? EndDate { get; set; }
 
         public int Limit { get; set; }
     }
