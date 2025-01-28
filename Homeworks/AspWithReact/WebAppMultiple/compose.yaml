@@ -1,6 +1,31 @@
-﻿services:
-  webappmultiple:
+﻿version: '3.8'
+
+services:
+  backend:
     image: webappmultiple
     build:
-      context: .
-      dockerfile: WebAppMultiple/Dockerfile
+      context: ./WebAppMultiple
+      dockerfile: Dockerfile
+    ports:
+      - "4090:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+    networks:
+      - app-network
+
+  frontend:
+    image: react-app-vite
+    build:
+      context: ./react-app-vite
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

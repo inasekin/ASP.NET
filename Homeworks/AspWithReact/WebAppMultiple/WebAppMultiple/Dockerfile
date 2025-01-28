@@ -1,16 +1,14 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
 WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
+EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["WebAppMultiple/WebAppMultiple.csproj", "WebAppMultiple/"]
-RUN dotnet restore "WebAppMultiple/WebAppMultiple.csproj"
+COPY ["WebAppMultiple.csproj", "./"]
+RUN dotnet restore "WebAppMultiple.csproj"
 COPY . .
-WORKDIR "/src/WebAppMultiple"
+WORKDIR "/src"
 RUN dotnet build "WebAppMultiple.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
