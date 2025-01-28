@@ -1,0 +1,6 @@
+﻿services:
+  webappmultiple:
+    image: webappmultiple
+    build:
+      context: .
+      dockerfile: WebAppMultiple/Dockerfile
