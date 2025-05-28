@@ -8,10 +8,14 @@ using Microsoft.Extensions.Configuration;
 using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 using Pcf.GivingToCustomer.Core.Abstractions.Repositories;
 using Pcf.GivingToCustomer.Core.Abstractions.Gateways;
+using Pcf.GivingToCustomer.Core.Services;
 using Pcf.GivingToCustomer.DataAccess.Data;
 using Pcf.GivingToCustomer.DataAccess;
 using Pcf.GivingToCustomer.DataAccess.Repositories;
 using Pcf.GivingToCustomer.Integration;
+using Pcf.GivingToCustomer.WebHost.Consumers;
+using Pcf.GivingToCustomer.WebHost.EventHandlers;
+using Pcf.Common.Events.Configuration;
 
 namespace Pcf.GivingToCustomer.WebHost
 {
@@ -33,6 +37,13 @@ namespace Pcf.GivingToCustomer.WebHost
             services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
             services.AddScoped<INotificationGateway, NotificationGateway>();
             services.AddScoped<IDbInitializer, EfDbInitializer>();
+            services.AddScoped<IPromoCodeService, PromoCodeService>();
+
+            // Настройка RabbitMQ
+            services.Configure<RabbitMQSettings>(Configuration.GetSection("RabbitMQ"));
+            services.AddScoped<PromoCodeReceivedEventHandler>();
+            services.AddHostedService<PromoCodeReceivedConsumer>();
+
             services.AddDbContext<DataContext>(x =>
             {
                 //x.UseSqlite("Filename=PromocodeFactoryGivingToCustomerDb.sqlite");

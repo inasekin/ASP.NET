@@ -10,6 +10,7 @@
       <ProjectReference Include="..\Pcf.GivingToCustomer.Core\Pcf.GivingToCustomer.Core.csproj" />
       <ProjectReference Include="..\Pcf.GivingToCustomer.DataAccess\Pcf.GivingToCustomer.DataAccess.csproj" />
       <ProjectReference Include="..\Pcf.GivingToCustomer.Integration\Pcf.GivingToCustomer.Integration.csproj" />
+      <ProjectReference Include="..\..\Pcf.Common.Events\Pcf.Common.Events.csproj" />
     </ItemGroup>
 
     <ItemGroup>

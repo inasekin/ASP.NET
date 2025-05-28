@@ -9,6 +9,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Pcf.Administration.Core\Pcf.Administration.Core.csproj" />
       <ProjectReference Include="..\Pcf.Administration.DataAccess\Pcf.Administration.DataAccess.csproj" />
+      <ProjectReference Include="..\..\Pcf.Common.Events\Pcf.Common.Events.csproj" />
     </ItemGroup>
 
     <ItemGroup>

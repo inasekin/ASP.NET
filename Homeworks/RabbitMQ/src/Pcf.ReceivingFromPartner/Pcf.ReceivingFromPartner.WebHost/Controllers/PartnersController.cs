@@ -6,8 +6,12 @@ using Microsoft.AspNetCore.Mvc;
 using Pcf.ReceivingFromPartner.Core.Abstractions.Repositories;
 using Pcf.ReceivingFromPartner.Core.Domain;
 using Pcf.ReceivingFromPartner.Core.Abstractions.Gateways;
+using Pcf.ReceivingFromPartner.Core.Services;
 using Pcf.ReceivingFromPartner.WebHost.Models;
 using Pcf.ReceivingFromPartner.WebHost.Mappers;
+using Pcf.Common.Events.Abstractions;
+using Pcf.Common.Events.Events;
+using Pcf.Common.Events.Constants;
 
 namespace Pcf.ReceivingFromPartner.WebHost.Controllers
 {
@@ -22,20 +26,20 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
         private readonly IRepository<Partner> _partnersRepository;
         private readonly IRepository<Preference> _preferencesRepository;
         private readonly INotificationGateway _notificationGateway;
-        private readonly IGivingPromoCodeToCustomerGateway _givingPromoCodeToCustomerGateway;
-        private readonly IAdministrationGateway _administrationGateway;
+        private readonly IPromoCodeService _promoCodeService;
+        private readonly IEventPublisher _eventPublisher;
 
         public PartnersController(IRepository<Partner> partnersRepository,
             IRepository<Preference> preferencesRepository,
             INotificationGateway notificationGateway,
-            IGivingPromoCodeToCustomerGateway givingPromoCodeToCustomerGateway,
-            IAdministrationGateway administrationGateway)
+            IPromoCodeService promoCodeService,
+            IEventPublisher eventPublisher)
         {
             _partnersRepository = partnersRepository;
             _preferencesRepository = preferencesRepository;
             _notificationGateway = notificationGateway;
-            _givingPromoCodeToCustomerGateway = givingPromoCodeToCustomerGateway;
-            _administrationGateway = administrationGateway;
+            _promoCodeService = promoCodeService;
+            _eventPublisher = eventPublisher;
         }
 
         /// <summary>
@@ -51,24 +55,23 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
                 Id = x.Id,
                 Name = x.Name,
                 NumberIssuedPromoCodes = x.NumberIssuedPromoCodes,
-                IsActive = true,
-                PartnerLimits = x.PartnerLimits
-                    .Select(y => new PartnerPromoCodeLimitResponse()
-                    {
-                        Id = y.Id,
-                        PartnerId = y.PartnerId,
-                        Limit = y.Limit,
-                        CreateDate = y.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                        EndDate = y.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                        CancelDate = y.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
-                    }).ToList()
-            });
+                IsActive = x.IsActive,
+                PartnerLimits = x.PartnerLimits.Select(y => new PartnerPromoCodeLimitResponse()
+                {
+                    Id = y.Id,
+                    PartnerId = y.PartnerId,
+                    CreateDate = y.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                    EndDate = y.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                    CancelDate = y.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
+                    Limit = y.Limit
+                }).ToList()
+            }).ToList();
 
             return Ok(response);
         }
 
         /// <summary>
-        /// Получить информацию партнере
+        /// Получить партнера по Id
         /// </summary>
         /// <param name="id">Id партнера, например: <example>20d2d612-db93-4ed5-86b1-ff2413bca655</example></param>
         [HttpGet("{id:guid}")]
@@ -77,26 +80,23 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
             var partner = await _partnersRepository.GetByIdAsync(id);
 
             if (partner == null)
-            {
                 return NotFound();
-            }
 
             var response = new PartnerResponse()
             {
                 Id = partner.Id,
                 Name = partner.Name,
                 NumberIssuedPromoCodes = partner.NumberIssuedPromoCodes,
-                IsActive = true,
-                PartnerLimits = partner.PartnerLimits
-                    .Select(y => new PartnerPromoCodeLimitResponse()
-                    {
-                        Id = y.Id,
-                        PartnerId = y.PartnerId,
-                        Limit = y.Limit,
-                        CreateDate = y.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                        EndDate = y.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
-                        CancelDate = y.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
-                    }).ToList()
+                IsActive = partner.IsActive,
+                PartnerLimits = partner.PartnerLimits.Select(y => new PartnerPromoCodeLimitResponse()
+                {
+                    Id = y.Id,
+                    PartnerId = y.PartnerId,
+                    CreateDate = y.CreateDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                    EndDate = y.EndDate.ToString("dd.MM.yyyy hh:mm:ss"),
+                    CancelDate = y.CancelDate?.ToString("dd.MM.yyyy hh:mm:ss"),
+                    Limit = y.Limit
+                }).ToList()
             };
 
             return Ok(response);
@@ -105,6 +105,8 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
         /// <summary>
         /// Установить лимит на промокоды для партнера
         /// </summary>
+        /// <param name="id">Id партнера, например: <example>20d2d612-db93-4ed5-86b1-ff2413bca655</example></param>
+        /// <param name="request">Данные запроса</param>
         [HttpPost("{id:guid}/limits")]
         public async Task<IActionResult> SetPartnerPromoCodeLimitAsync(Guid id, SetPartnerPromoCodeLimitRequest request)
         {
@@ -117,29 +119,22 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
             if (!partner.IsActive)
                 return BadRequest("Данный партнер не активен");
 
-            //Установка лимита партнеру
+            //Отключение лимита
             var activeLimit = partner.PartnerLimits.FirstOrDefault(x =>
                 !x.CancelDate.HasValue);
 
             if (activeLimit != null)
             {
-                //Если партнеру выставляется лимит, то мы 
-                //должны обнулить количество промокодов, которые партнер выдал, если лимит закончился, 
-                //то количество не обнуляется
-                partner.NumberIssuedPromoCodes = 0;
-
-                //При установке лимита нужно отключить предыдущий лимит
                 activeLimit.CancelDate = DateTime.Now;
             }
 
-            if (request.Limit <= 0)
-                return BadRequest("Лимит должен быть больше 0");
-
+            //Установка лимита
             var newLimit = new PartnerPromoCodeLimit()
             {
-                Limit = request.Limit,
-                Partner = partner,
+                Id = Guid.NewGuid(),
                 PartnerId = partner.Id,
+                Partner = partner,
+                Limit = request.Limit,
                 CreateDate = DateTime.Now,
                 EndDate = request.EndDate
             };
@@ -148,6 +143,7 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
 
             await _partnersRepository.UpdateAsync(partner);
 
+            //Отправляем уведомление
             await _notificationGateway
                 .SendNotificationToPartnerAsync(partner.Id, "Вам установлен лимит на отправку промокодов...");
 
@@ -291,59 +287,47 @@ namespace Pcf.ReceivingFromPartner.WebHost.Controllers
         public async Task<IActionResult> ReceivePromoCodeFromPartnerWithPreferenceAsync(Guid id,
             ReceivingPromoCodeRequest request)
         {
-            var partner = await _partnersRepository.GetByIdAsync(id);
-
-            if (partner == null)
+            try
             {
-                return BadRequest("Партнер не найден");
+                // Маппим модель из WebHost в Core
+                var coreRequest = new Core.Models.ReceivingPromoCodeRequest
+                {
+                    ServiceInfo = request.ServiceInfo,
+                    PromoCode = request.PromoCode,
+                    PreferenceId = request.PreferenceId,
+                    PartnerManagerId = request.PartnerManagerId
+                };
+
+                // Используем сервис для обработки промокода
+                var promoCode = await _promoCodeService.ProcessPromoCodeFromPartnerAsync(id, coreRequest);
+
+                // Публикуем событие в RabbitMQ вместо синхронных HTTP вызовов
+                var promoCodeEvent = new PromoCodeReceivedEvent
+                {
+                    PromoCodeId = promoCode.Id,
+                    Code = promoCode.Code,
+                    ServiceInfo = promoCode.ServiceInfo,
+                    BeginDate = promoCode.BeginDate,
+                    EndDate = promoCode.EndDate,
+                    PartnerId = promoCode.PartnerId,
+                    PreferenceId = promoCode.PreferenceId,
+                    PartnerManagerId = promoCode.PartnerManagerId,
+                    EventTimestamp = DateTime.UtcNow
+                };
+
+                await _eventPublisher.PublishAsync(promoCodeEvent, RoutingKeys.PromoCodeReceived);
+
+                return CreatedAtAction(nameof(GetPartnerPromoCodeAsync),
+                    new { id = promoCode.PartnerId, promoCodeId = promoCode.Id }, null);
             }
-
-            var activeLimit = partner.PartnerLimits.FirstOrDefault(x
-                => !x.CancelDate.HasValue && x.EndDate > DateTime.Now);
-
-            if (activeLimit == null)
+            catch (ArgumentException ex)
             {
-                return BadRequest("Нет доступного лимита на предоставление промокодов");
+                return BadRequest(ex.Message);
             }
-
-            if (partner.NumberIssuedPromoCodes + 1 > activeLimit.Limit)
+            catch (InvalidOperationException ex)
             {
-                return BadRequest("Лимит на выдачу промокодов превышен");
+                return BadRequest(ex.Message);
             }
-
-            if (partner.PromoCodes.Any(x => x.Code == request.PromoCode))
-            {
-                return BadRequest("Данный промокод уже был выдан ранее");
-            }
-
-            //Получаем предпочтение по имени
-            var preference = await _preferencesRepository.GetByIdAsync(request.PreferenceId);
-
-            if (preference == null)
-            {
-                return BadRequest("Предпочтение не найдено");
-            }
-
-            PromoCode promoCode = PromoCodeMapper.MapFromModel(request, preference, partner);
-            partner.PromoCodes.Add(promoCode);
-            partner.NumberIssuedPromoCodes++;
-
-            await _partnersRepository.UpdateAsync(partner);
-
-            //TODO: Чтобы информация о том, что промокод был выдан парнером была отправлена
-            //в микросервис рассылки клиентам нужно либо вызвать его API, либо отправить событие в очередь
-            await _givingPromoCodeToCustomerGateway.GivePromoCodeToCustomer(promoCode);
-
-            //TODO: Чтобы информация о том, что промокод был выдан парнером была отправлена
-            //в микросервис администрирования нужно либо вызвать его API, либо отправить событие в очередь
-
-            if (request.PartnerManagerId.HasValue)
-            {
-                await _administrationGateway.NotifyAdminAboutPartnerManagerPromoCode(request.PartnerManagerId.Value);
-            }
-
-            return CreatedAtAction(nameof(GetPartnerPromoCodeAsync),
-                new { id = partner.Id, promoCodeId = promoCode.Id }, null);
         }
     }
 }

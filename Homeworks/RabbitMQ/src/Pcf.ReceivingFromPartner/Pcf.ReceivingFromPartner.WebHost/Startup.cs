@@ -8,10 +8,14 @@ using Microsoft.Extensions.Configuration;
 using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 using Pcf.ReceivingFromPartner.Core.Abstractions.Repositories;
 using Pcf.ReceivingFromPartner.Core.Abstractions.Gateways;
+using Pcf.ReceivingFromPartner.Core.Services;
 using Pcf.ReceivingFromPartner.DataAccess;
 using Pcf.ReceivingFromPartner.DataAccess.Repositories;
 using Pcf.ReceivingFromPartner.DataAccess.Data;
 using Pcf.ReceivingFromPartner.Integration;
+using Pcf.Common.Events.Abstractions;
+using Pcf.Common.Events.Configuration;
+using Pcf.Common.Events.Services;
 
 namespace Pcf.ReceivingFromPartner.WebHost
 {
@@ -33,6 +37,11 @@ namespace Pcf.ReceivingFromPartner.WebHost
             services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
             services.AddScoped<INotificationGateway, NotificationGateway>();
             services.AddScoped<IDbInitializer, EfDbInitializer>();
+            services.AddScoped<IPromoCodeService, PromoCodeService>();
+
+            // Настройка RabbitMQ
+            services.Configure<RabbitMQSettings>(Configuration.GetSection("RabbitMQ"));
+            services.AddSingleton<IEventPublisher, RabbitMQEventPublisher>();
 
             services.AddHttpClient<IGivingPromoCodeToCustomerGateway, GivingPromoCodeToCustomerGateway>(c =>
             {
