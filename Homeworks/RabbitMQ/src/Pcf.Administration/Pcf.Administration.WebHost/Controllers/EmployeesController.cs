@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Pcf.Administration.Core.Abstractions.Repositories;
 using Pcf.Administration.Core.Domain.Administration;
+using Pcf.Administration.Core.Services;
 using Pcf.Administration.WebHost.Models;
 
 namespace Pcf.Administration.WebHost.Controllers
@@ -18,10 +19,12 @@ namespace Pcf.Administration.WebHost.Controllers
         : ControllerBase
     {
         private readonly IRepository<Employee> _employeeRepository;
+        private readonly IEmployeeService _employeeService;
 
-        public EmployeesController(IRepository<Employee> employeeRepository)
+        public EmployeesController(IRepository<Employee> employeeRepository, IEmployeeService employeeService)
         {
             _employeeRepository = employeeRepository;
+            _employeeService = employeeService;
         }
 
         /// <summary>
@@ -80,19 +83,17 @@ namespace Pcf.Administration.WebHost.Controllers
         /// <param name="id">Id сотрудника, например <example>451533d5-d8d5-4a11-9c7b-eb9f14e1a32f</example></param>
         /// <returns></returns>
         [HttpPost("{id:guid}/appliedPromocodes")]
-
         public async Task<IActionResult> UpdateAppliedPromocodesAsync(Guid id)
         {
-            var employee = await _employeeRepository.GetByIdAsync(id);
-
-            if (employee == null)
+            try
+            {
+                await _employeeService.UpdateAppliedPromocodesCountAsync(id);
+                return Ok();
+            }
+            catch (ArgumentException)
+            {
                 return NotFound();
-
-            employee.AppliedPromocodesCount++;
-
-            await _employeeRepository.UpdateAsync(employee);
-
-            return Ok();
+            }
         }
     }
 }

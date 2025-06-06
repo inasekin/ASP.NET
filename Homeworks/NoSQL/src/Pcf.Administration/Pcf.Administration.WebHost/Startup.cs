@@ -10,10 +10,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Pcf.Administration.Core.Abstractions.Repositories;
 using Pcf.Administration.DataAccess;
 using Pcf.Administration.DataAccess.Data;
 using Pcf.Administration.DataAccess.Repositories;
+using Pcf.Administration.DataAccess.Repositories.Mongo;
+using Pcf.Administration.DataAccess.MongoModels;
 using Pcf.Administration.Core.Domain.Administration;
 using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 
@@ -34,7 +37,19 @@ namespace Pcf.Administration.WebHost
         {
             services.AddControllers().AddMvcOptions(x=> 
                 x.SuppressAsyncSuffixInActionNames = false);
-            services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+                
+            // MongoDB настройки
+            services.Configure<MongoDatabaseSettings>(
+                Configuration.GetSection(nameof(MongoConnection)));
+            
+            services.AddSingleton<IMongoDatabaseSettings>(sp =>
+                sp.GetRequiredService<IOptions<MongoDatabaseSettings>>().Value);
+                
+            // Регистрация MongoDB репозиториев
+            services.AddScoped<IRepository<Employee>, MongoEmployeeRepository>();
+            services.AddScoped<IRepository<Role>, MongoRoleRepository>();
+                
+            // Оставляем DbContext для миграций
             services.AddScoped<IDbInitializer, EfDbInitializer>();
             services.AddDbContext<DataContext>(x =>
             {

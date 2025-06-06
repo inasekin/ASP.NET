@@ -9,6 +9,10 @@ using Pcf.Administration.DataAccess;
 using Pcf.Administration.DataAccess.Repositories;
 using Pcf.Administration.DataAccess.Data;
 using Pcf.Administration.Core.Abstractions.Repositories;
+using Pcf.Administration.Core.Services;
+using Pcf.Administration.WebHost.Consumers;
+using Pcf.Administration.WebHost.EventHandlers;
+using Pcf.Common.Events.Configuration;
 using System;
 
 namespace Pcf.Administration.WebHost
@@ -30,6 +34,13 @@ namespace Pcf.Administration.WebHost
                 x.SuppressAsyncSuffixInActionNames = false);
             services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
             services.AddScoped<IDbInitializer, EfDbInitializer>();
+            services.AddScoped<IEmployeeService, EmployeeService>();
+
+            // Настройка RabbitMQ
+            services.Configure<RabbitMQSettings>(Configuration.GetSection("RabbitMQ"));
+            services.AddScoped<PromoCodeReceivedEventHandler>();
+            services.AddHostedService<PromoCodeReceivedConsumer>();
+
             services.AddDbContext<DataContext>(x =>
             {
                 //x.UseSqlite("Filename=PromocodeFactoryAdministrationDb.sqlite");
