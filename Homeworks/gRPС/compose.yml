@@ -1,0 +1,105 @@
+services:
+  # RabbitMQ
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: "rabbitmq-pcf"
+    restart: always
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  #Administration Db
+  promocode-factory-administration-db:
+    image: "postgres:latest"
+    container_name: "promocode-factory-administration-db"
+    restart: always
+    ports:
+      - 5433:5432
+    environment:
+      - POSTGRES_PASSWORD=docker
+
+  #Administration Api
+  promocode-factory-administration-api:
+    build:
+      context: src/
+      dockerfile: Pcf.Administration/Dockerfile
+    container_name: "promocode-factory-administration-api"
+    restart: always
+    ports:
+      - "8091:8080"
+    environment:
+      - "ConnectionStrings:PromocodeFactoryAdministrationDb=Host=promocode-factory-administration-db;Database=promocode_factory_administration_db;Username=postgres;Password=docker"
+      - "RabbitMQ:Host=rabbitmq-pcf"
+      - "RabbitMQ:Port=5672"
+      - "RabbitMQ:Username=admin"
+      - "RabbitMQ:Password=admin"
+    depends_on:
+      - promocode-factory-administration-db
+      - rabbitmq
+
+  #ReceivingFromPartner Db
+  promocode-factory-receiving-from-partner-db:
+    image: "postgres:latest"
+    container_name: "promocode-factory-receiving-from-partner-db"
+    restart: always
+    ports:
+      - 5434:5432
+    environment:
+      - POSTGRES_PASSWORD=docker
+
+  #ReceivingFromPartner Api
+  promocode-factory-receiving-from-partner-api:
+    build:
+      context: src/
+      dockerfile: Pcf.ReceivingFromPartner/Dockerfile
+    container_name: "promocode-factory-receiving-from-partner-api"
+    restart: always
+    ports:
+      - "8092:8080"
+    environment:
+      - "ConnectionStrings:PromocodeFactoryReceivingFromPartnerDb=Host=promocode-factory-receiving-from-partner-db;Database=promocode_factory_receiving_from_partner_db;Username=postgres;Password=docker"
+      - "IntegrationSettings:GivingToCustomerApiUrl=http://promocode-factory-giving-to-customer-api"
+      - "IntegrationSettings:AdministrationApiUrl=http://promocode-factory-administration-api"
+      - "RabbitMQ:Host=rabbitmq-pcf"
+      - "RabbitMQ:Port=5672"
+      - "RabbitMQ:Username=admin"
+      - "RabbitMQ:Password=admin"
+    depends_on:
+      - promocode-factory-receiving-from-partner-db
+      - rabbitmq
+
+  #GivingToCustomer Db
+  promocode-factory-giving-to-customer-db:
+    image: "postgres:latest"
+    container_name: "promocode-factory-giving-to-customer-db"
+    restart: always
+    ports:
+      - 5435:5432
+    environment:
+      - POSTGRES_PASSWORD=docker
+
+  #GivingToCustomer Api
+  promocode-factory-giving-to-customer-api:
+    build:
+      context: src/
+      dockerfile: Pcf.GivingToCustomer/Dockerfile
+    container_name: "promocode-factory-giving-to-customer-api"
+    restart: always
+    ports:
+      - "8093:8080"
+    environment:
+      - "ConnectionStrings:PromocodeFactoryGivingToCustomerDb=Host=promocode-factory-giving-to-customer-db;Database=promocode_factory_giving_to_customer_db;Username=postgres;Password=docker"
+      - "RabbitMQ:Host=host.docker.internal"
+      - "RabbitMQ:Port=5672"
+      - "RabbitMQ:Username=admin"
+      - "RabbitMQ:Password=admin"
+    depends_on:
+      - promocode-factory-giving-to-customer-db
+
+volumes:
+  rabbitmq_data:
